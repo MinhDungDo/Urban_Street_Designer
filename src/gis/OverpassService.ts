@@ -33,7 +33,7 @@ export interface OverpassResponse {
   elements: OverpassElement[];
 }
 
-const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
+const OVERPASS_ENDPOINT = '/api/overpass';
 
 function buildQuery(bbox: BoundingBox): string {
   const { minLat, minLon, maxLat, maxLon } = bbox;
