@@ -1,32 +1,27 @@
-import type { IncomingMessage, ServerResponse } from 'node:http';
-
-export const config = {
-  api: { bodyParser: false },
-};
-
-export default async function handler(req: IncomingMessage, res: ServerResponse) {
+export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
-    res.writeHead(405).end('Method Not Allowed');
+    res.status(405).end('Method Not Allowed');
     return;
   }
 
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
+  const { query } = req.body as { query: string };
+  if (!query) {
+    res.status(400).json({ error: 'Missing query' });
+    return;
   }
-  const rawBody = Buffer.concat(chunks).toString();
 
   const upstream = await fetch('https://overpass-api.de/api/interpreter', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: rawBody,
+    body: `data=${encodeURIComponent(query)}`,
   });
 
   if (!upstream.ok) {
-    res.writeHead(upstream.status).end(upstream.statusText);
+    res.status(upstream.status).end(upstream.statusText);
     return;
   }
 
   const data = await upstream.text();
-  res.writeHead(200, { 'Content-Type': 'application/json' }).end(data);
+  res.setHeader('Content-Type', 'application/json');
+  res.status(200).send(data);
 }

@@ -57,8 +57,8 @@ export async function fetchOSMData(bbox: BoundingBox): Promise<OverpassResponse>
 
   const response = await fetch(OVERPASS_ENDPOINT, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `data=${encodeURIComponent(query)}`,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query }),
   });
 
   if (!response.ok) {
