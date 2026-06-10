@@ -1,27 +1,39 @@
-export default async function handler(req: any, res: any) {
+export const config = {
+  runtime: 'edge',
+};
+
+export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
-    res.status(405).end('Method Not Allowed');
-    return;
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
-  const { query } = req.body as { query: string };
+  let query: string;
+  try {
+    const body = await req.json() as { query?: string };
+    query = body.query ?? '';
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   if (!query) {
-    res.status(400).json({ error: 'Missing query' });
-    return;
+    return new Response(JSON.stringify({ error: 'Missing query' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   const upstream = await fetch('https://overpass-api.de/api/interpreter', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `data=${encodeURIComponent(query)}`,
+    body: new URLSearchParams({ data: query }),
   });
 
-  if (!upstream.ok) {
-    res.status(upstream.status).end(upstream.statusText);
-    return;
-  }
-
   const data = await upstream.text();
-  res.setHeader('Content-Type', 'application/json');
-  res.status(200).send(data);
+  return new Response(data, {
+    status: upstream.status,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
