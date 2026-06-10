@@ -9,6 +9,12 @@ import type { ProjectionOrigin } from '../utils/projection';
 export type AppStatus = 'idle' | 'selecting' | 'loading' | 'loaded' | 'error';
 export type AppTab = 'map' | 'editor';
 
+export interface LogEntry {
+  timestamp: string;
+  status: AppStatus;
+  message: string;
+}
+
 export interface PriceConfig {
   lanePerKm: number;        // € per lane-km
   bikeLanePerKm: number;    // € per bike-lane-km (one side)
@@ -48,6 +54,7 @@ export interface UrbanDesignerState {
   activeTab: AppTab;
   status: AppStatus;
   statusMessage: string;
+  logs: LogEntry[];
   bbox: BoundingBox | null;
   projectionOrigin: ProjectionOrigin | null;
 
@@ -90,6 +97,7 @@ const initialState = {
   activeTab: 'map' as AppTab,
   status: 'idle' as AppStatus,
   statusMessage: 'Draw a bounding box on the map to begin.',
+  logs: [] as LogEntry[],
   bbox: null,
   projectionOrigin: null,
   roads: [] as RoadSegment[],
@@ -108,7 +116,11 @@ export const useUrbanStore = create<UrbanDesignerState>()(
     setStatus: (status, message) =>
       set((s) => {
         s.status = status;
-        if (message) s.statusMessage = message;
+        if (message) {
+          s.statusMessage = message;
+          s.logs.unshift({ timestamp: new Date().toISOString(), status, message });
+          if (s.logs.length > 100) s.logs.length = 100;
+        }
       }),
 
     setBbox: (bbox) => set((s) => { s.bbox = bbox; }),

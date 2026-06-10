@@ -14,6 +14,7 @@ export const MapPanel: React.FC<MapPanelProps> = ({ onBboxSelected, onGenerate }
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [pendingBbox, setPendingBbox] = useState<BoundingBox | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [spaceHeld, setSpaceHeld] = useState(false);
   const boxRef = useRef<HTMLDivElement | null>(null);
   const startPixel = useRef<[number, number] | null>(null);
   const startLngLat = useRef<[number, number] | null>(null);
@@ -26,20 +27,62 @@ export const MapPanel: React.FC<MapPanelProps> = ({ onBboxSelected, onGenerate }
       container: containerRef.current,
       style: {
         version: 8,
-        sources: { osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, attribution: '© OpenStreetMap contributors' } },
-        layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
+        sources: {
+          carto: {
+            type: 'raster',
+            tiles: ['https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+                    'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+                    'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            maxzoom: 19,
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/">CARTO</a>',
+          },
+        },
+        layers: [{ id: 'carto', type: 'raster', source: 'carto' }],
       },
       center: [8.8017, 53.0793],
       zoom: 14,
-      // Default MapLibre controls: left-drag = pan, scroll = zoom, right-drag = rotate
     });
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
     mapRef.current = map;
     return () => map.remove();
   }, []);
 
+  // Space key: hold to enter draw mode, releases map pan/rotate while held
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault();
+        setSpaceHeld(true);
+        mapRef.current?.dragPan.disable();
+        mapRef.current?.dragRotate.disable();
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setSpaceHeld(false);
+        mapRef.current?.dragPan.enable();
+        mapRef.current?.dragRotate.enable();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, []);
+
+  const clearMapBbox = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (map.getLayer('bbox-fill')) map.removeLayer('bbox-fill');
+    if (map.getLayer('bbox-line')) map.removeLayer('bbox-line');
+    if (map.getSource('bbox')) map.removeSource('bbox');
+  }, []);
+
   const startDraw = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!mapRef.current || isLoading || !e.ctrlKey) return;
+    if (!mapRef.current || isLoading || !spaceHeld) return;
     e.preventDefault();
     const rect = containerRef.current!.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -55,7 +98,7 @@ export const MapPanel: React.FC<MapPanelProps> = ({ onBboxSelected, onGenerate }
     box.style.cssText = 'position:absolute;border:2px solid #00d4ff;background:rgba(0,212,255,0.08);pointer-events:none;box-sizing:border-box;z-index:10;border-radius:2px;';
     containerRef.current!.appendChild(box);
     boxRef.current = box;
-  }, [isLoading]);
+  }, [isLoading, spaceHeld, clearMapBbox]);
 
   const onMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!isDrawing || !startPixel.current || !boxRef.current) return;
@@ -68,14 +111,6 @@ export const MapPanel: React.FC<MapPanelProps> = ({ onBboxSelected, onGenerate }
     boxRef.current.style.width = `${Math.abs(x - sx)}px`;
     boxRef.current.style.height = `${Math.abs(y - sy)}px`;
   }, [isDrawing]);
-
-  const clearMapBbox = () => {
-    const map = mapRef.current;
-    if (!map) return;
-    if (map.getLayer('bbox-fill')) map.removeLayer('bbox-fill');
-    if (map.getLayer('bbox-line')) map.removeLayer('bbox-line');
-    if (map.getSource('bbox')) map.removeSource('bbox');
-  };
 
   const endDraw = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!isDrawing || !mapRef.current || !startLngLat.current || !startPixel.current) return;
@@ -108,12 +143,18 @@ export const MapPanel: React.FC<MapPanelProps> = ({ onBboxSelected, onGenerate }
     });
     map.addLayer({ id: 'bbox-fill', type: 'fill', source: 'bbox', paint: { 'fill-color': '#00d4ff', 'fill-opacity': 0.1 } });
     map.addLayer({ id: 'bbox-line', type: 'line', source: 'bbox', paint: { 'line-color': '#00d4ff', 'line-width': 2, 'line-dasharray': [4, 2] } });
-  }, [isDrawing, onBboxSelected]);
+  }, [isDrawing, onBboxSelected, clearMapBbox]);
 
   const handleReset = () => {
     setPendingBbox(null);
     clearMapBbox();
   };
+
+  let cursor: string;
+  if (isLoading) cursor = 'wait';
+  else if (isDrawing) cursor = 'crosshair';
+  else if (spaceHeld) cursor = 'crosshair';
+  else cursor = 'grab';
 
   return (
     <div className="map-tab">
@@ -126,8 +167,8 @@ export const MapPanel: React.FC<MapPanelProps> = ({ onBboxSelected, onGenerate }
           <kbd>Scroll</kbd>
           <span>Zoom</span>
         </div>
-        <div className="inst-item">
-          <kbd>Ctrl + drag</kbd>
+        <div className={`inst-item ${spaceHeld ? 'inst-active' : ''}`}>
+          <kbd>Space + drag</kbd>
           <span>Draw bounding box</span>
         </div>
         <div className="inst-item">
@@ -139,7 +180,7 @@ export const MapPanel: React.FC<MapPanelProps> = ({ onBboxSelected, onGenerate }
       <div
         ref={containerRef}
         className="map-container"
-        style={{ cursor: isLoading ? 'wait' : isDrawing ? 'crosshair' : (typeof window !== 'undefined' ? undefined : 'grab') }}
+        style={{ cursor }}
         onMouseDown={startDraw}
         onMouseMove={onMouseMove}
         onMouseUp={endDraw}

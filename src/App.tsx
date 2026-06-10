@@ -14,7 +14,8 @@ import './App.css';
 type RightTab = 'inspector' | 'cost' | 'save';
 
 export const App: React.FC = () => {
-  const { activeTab, setActiveTab, status, statusMessage, reset } = useUrbanStore();
+  const { activeTab, setActiveTab, status, statusMessage, logs, reset } = useUrbanStore();
+  const [showLogs, setShowLogs] = useState(false);
   const [pendingBbox, setPendingBbox] = useState<BoundingBox | null>(null);
   const [rebuildTrigger, setRebuildTrigger] = useState<{ roadId: string; road: RoadSegment } | null>(null);
   const [rightTab, setRightTab] = useState<RightTab>('inspector');
@@ -132,7 +133,7 @@ export const App: React.FC = () => {
       </div>
 
       {/* ── Status Bar ── */}
-      <footer className="status-bar">
+      <footer className="status-bar" onClick={() => setShowLogs(true)} title="Click to view logs">
         <div className={`status-dot status-${status}`} />
         <span className="status-msg">{statusMessage}</span>
         {status === 'loaded' && (
@@ -142,7 +143,33 @@ export const App: React.FC = () => {
             {useUrbanStore.getState().trees.length} trees
           </span>
         )}
+        <span className="status-log-hint">View logs</span>
       </footer>
+
+      {/* ── Log Drawer ── */}
+      {showLogs && (
+        <div className="log-overlay" onClick={() => setShowLogs(false)}>
+          <div className="log-drawer" onClick={(e) => e.stopPropagation()}>
+            <div className="log-drawer-header">
+              <span>Activity Log</span>
+              <button className="btn btn-ghost btn-xs" onClick={() => setShowLogs(false)}>✕</button>
+            </div>
+            <div className="log-drawer-body">
+              {logs.length === 0 ? (
+                <div className="log-empty">No activity yet.</div>
+              ) : (
+                logs.map((entry, i) => (
+                  <div key={i} className={`log-entry log-entry-${entry.status}`}>
+                    <span className="log-time">{new Date(entry.timestamp).toLocaleTimeString()}</span>
+                    <div className={`log-dot status-${entry.status}`} />
+                    <span className="log-msg">{entry.message}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
