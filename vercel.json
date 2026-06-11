@@ -8,13 +8,6 @@
     }
   },
   "rewrites": [
-    {
-      "source": "/api/overpass",
-      "destination": "/api/overpass"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
