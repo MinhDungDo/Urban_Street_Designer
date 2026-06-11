@@ -73,7 +73,8 @@ export async function fetchOSMData(bbox: BoundingBox): Promise<OverpassResponse>
     let detail = response.statusText;
     try {
       const body = await response.json() as { error?: string; detail?: string };
-      detail = body.error ?? body.detail ?? detail;
+      // Show the most specific message: upstream detail > our error label > HTTP status text
+      detail = body.detail ?? body.error ?? detail;
     } catch { /* non-JSON error body */ }
     throw new Error(`Proxy error ${response.status}: ${detail}`);
   }

@@ -41,7 +41,11 @@ function overpassDevProxy(): Plugin {
 
           fetch('https://overpass-api.de/api/interpreter', {
             method: 'POST',
-            body: new URLSearchParams({ data: query }),
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'User-Agent': 'UrbanStreetDesigner/1.0',
+            },
+            body: `data=${encodeURIComponent(query)}`,
           })
             .then(async (upstream) => {
               const text = await upstream.text();

@@ -31,7 +31,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const upstream = await fetch(OVERPASS_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'UrbanStreetDesigner/1.0',
+      },
       body: `data=${encodeURIComponent(query)}`,
       signal: controller.signal,
     });
